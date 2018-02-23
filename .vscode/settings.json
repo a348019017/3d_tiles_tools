@@ -1,0 +1,9 @@
+{
+    "typescript.tsdk": "node_modules\\typescript\\lib",
+    "files.exclude": {
+        // exclude .js and .js.map files, when in a TypeScript project
+        
+        "**/*.js": { "when": "$(basename).ts"},
+        "**/*.js.map": true
+    }
+}

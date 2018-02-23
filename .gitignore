@@ -59,7 +59,7 @@ typings/
 
 # Debug file
 bin/debug.js
-.vscode
+
 
 
 # testData
