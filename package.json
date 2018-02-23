@@ -1,0 +1,49 @@
+{
+  "name": "objto3d-tiles",
+  "version": "1.0.0",
+  "description": "obj to 3d tiles",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PrincessGod/objTo3d-tiles.git"
+  },
+  "keywords": [
+    "3d-tiles",
+    "cesium"
+  ],
+  "author": "PG",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/PrincessGod/objTo3d-tiles/issues"
+  },
+  "homepage": "https://github.com/PrincessGod/objTo3d-tiles#readme",
+  "dependencies": {
+    "@types/shapefile": "^0.5.2",
+    "bluebird": "^3.5.1",
+    "cesium": "^1.38.0",
+    "eslint": "^4.9.0",
+    "eslint-config-cesium": "^2.0.1",
+    "fs-extra": "^4.0.2",
+    "gltf-import-export": "^1.0.7",
+    "jpeg-js": "^0.3.3",
+    "lodash": "^4.17.5",
+    "mime": "^2.0.3",
+    "node-fetch": "^2.0.0",
+    "pngjs": "^3.3.0",
+    "shapefile": "^0.6.6",
+    "yargs": "^10.0.3"
+  },
+  "devDependencies": {
+    "@types/bluebird": "^3.5.20",
+    "@types/fs-extra": "^5.0.0",
+    "@types/lodash": "^4.14.101",
+    "@types/node-fetch": "^1.6.7",
+    "typescript": "^2.6.2"
+  }
+}
