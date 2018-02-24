@@ -160,9 +160,10 @@ export function ConvertToGLB(gltf: any, sourceFilename: string):Buffer {
             let data = dataFromUri(image, sourceFilename);
             if (data == null) {
                 delete image['uri'];
+                console.log("uriNotData！");
                 continue;
             }
-
+            //if(!data.buffer||data.buffer.length==0) console.log(image+"err");
             let bufferView = {
                 buffer: 0,
                 byteOffset: bufferOffset,
@@ -176,7 +177,7 @@ export function ConvertToGLB(gltf: any, sourceFilename: string):Buffer {
             let bufferViewIndex = gltf.bufferViews.length;
             gltf.bufferViews.push(bufferView);
             outputBuffers.push(data.buffer);
-
+                      
             image['bufferView'] = bufferViewIndex;
             image['mimeType'] = data.mimeType;
             delete image['uri'];

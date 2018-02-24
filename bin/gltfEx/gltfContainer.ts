@@ -11,8 +11,8 @@ import { SIGTERM } from 'constants';
 import { URL } from 'url';
 import  mime=require("mime");
 import path=require('path')
-import gltf2glb=require("../../lib/gltfToGlb");
-import { ConvertGltfToGLB, ConvertToGLB} from './gltfExporter';
+import {ConvertToGLB} from './gltfExporter';
+import * as glb2b3dm from '../b3dm/glbToB3dm';
 
 var ComponentDatatype = Cesium.ComponentDatatype;
 var defined = Cesium.defined;
@@ -70,7 +70,8 @@ export class gltfContainerEx{
      private  _buffer:any={};
      //解析出对应于gltf中的buffer，可能多个,默认只有一个
      private _buffers:Array<Buffer>=[];
-   
+   //gltf对应的文件名称或者目录，编译查找额外引用的资源
+     private _fileName:string;
     
      //返回当前容器中的gltf文件
     public get Gltf(): any {
@@ -143,10 +144,8 @@ export class gltfContainerEx{
     
 
     //保存为gltf文件
-    public SaveAsGLTF(filePath: string, options: gltfWriterOptions = {
-        embedImage: true,
-        //嵌入buffer到gltf文件中
-        embedBuffer: true,exportB3dm:false,exportglb:false
+    public  SaveAs(filePath: string, options: gltfWriterOptions = {
+        embedImage: false,      
     }): void {   
          //默认在有images的情况下添加一个sampler
          if (this._gltf.images.length > 0) {
@@ -161,7 +160,6 @@ export class gltfContainerEx{
         this.mergeBufferToNewBuffer()
         //修正bufferView的参数
        
-     
         this._gltf.bufferViews[1].byteOffset=0;
         this._gltf.bufferViews[1].byteLength=this._buffer.positionsAndNormals.length;
 
@@ -179,22 +177,30 @@ export class gltfContainerEx{
         this._gltf.buffers[0]={};
         this._gltf.buffers[0].byteLength = source.byteLength;
         this._gltf.buffers[0].uri = 'data:application/octet-stream;base64,' + source.toString('base64');
-        
-        //添加一个可能的坐标变换矩阵，
-        //this._gltf.
-        //将images嵌入在uri中
-        if (options.embedImage) {
-            this._gltf.images.forEach(img => { this.embedImage(img, filePath); });
-        }
-
-        if (options.exportglb) {
-            //let result= gltf2glb(this._gltf,null);
-            //fs.outputFileSync(filePath,result);
-            let bufferGlb= ConvertToGLB(this.Gltf, filePath);
-            //glb再转换成b3dm
-        }
-        else {
+          
+        //根据扩展名判断需要保存的路径
+        let ext= path.extname(filePath);
+        if (ext == ".gltf") {
+            if (options.embedImage) {
+                this._gltf.images.forEach(img => { this.embedImage(img, filePath); });
+            }
             fs.writeJsonSync(filePath, this._gltf);
+        }
+        else if (ext == ".glb") {
+            //获取 
+            let bufferGlb = ConvertToGLB(this.Gltf, filePath);
+            fs.outputFileSync(filePath, bufferGlb, 'binary');
+
+        } else if (ext == ".b3dm") {
+            let dir = path.resolve(filePath, "..");
+            let bufferGlb = ConvertToGLB(this.Gltf, filePath);
+            var featureTableJson = {
+                BATCH_LENGTH: 0
+            };
+            fs.outputFile(filePath, glb2b3dm(bufferGlb, featureTableJson));
+
+        } else {
+            console.log("err file extension,cant saveAs!");
         }
     }
 
@@ -491,7 +497,9 @@ export class gltfContainerEx{
             let imgIndex=this._gltf.images.findIndex(ele=>{return  ele.uri===image.uri;});     
             if(imgIndex==-1)
             {
-                this._gltf.images.push(image);newTexture.source=this._gltf.images.length-1;
+                let img=_.cloneDeep(image);
+                this._gltf.images.push(img);
+                newTexture.source=this._gltf.images.length-1;
             }else
             {
                 newTexture.source=imgIndex;
@@ -533,14 +541,8 @@ export class gltfContainerEx{
 //gltf写接口的参数
 export interface gltfWriterOptions
 {
-    //嵌入图像到gltf文件中
-     embedImage:boolean;
-     //嵌入buffer到gltf文件中
-     embedBuffer:boolean;
-     //额外导出为b3dm
-     exportB3dm:boolean;
-     //导出为glb,反之为gltf
-     exportglb:boolean;
+    //嵌入图像到gltf文件中,仅针对输出为gltf有效
+     embedImage?:boolean;
 }
 
 
@@ -559,7 +561,7 @@ export class gltfContainerExTest
         container?newContainer.AddNode(container.Gltf.nodes[2],container):null;
         container?newContainer.AddNode(container.Gltf.nodes[3],container):null;
         container?newContainer.AddNode(container.Gltf.nodes[4],container):null;
-        newContainer.SaveAsGLTF(outputPath);
+        newContainer.SaveAs(outputPath);
     }
 }
 

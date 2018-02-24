@@ -9,6 +9,7 @@ const envelop3D_1 = require("../quadtree/envelop3D");
 const mime = require("mime");
 const path = require("path");
 const gltfExporter_1 = require("./gltfExporter");
+const glb2b3dm = require("../b3dm/glbToB3dm");
 var ComponentDatatype = Cesium.ComponentDatatype;
 var defined = Cesium.defined;
 //对应于bufferView中的target
@@ -206,10 +207,8 @@ class gltfContainerEx {
         return maxExtent;
     }
     //保存为gltf文件
-    SaveAsGLTF(filePath, options = {
-            embedImage: true,
-            //嵌入buffer到gltf文件中
-            embedBuffer: true, exportB3dm: false, exportglb: false
+    SaveAs(filePath, options = {
+            embedImage: false,
         }) {
         //默认在有images的情况下添加一个sampler
         if (this._gltf.images.length > 0) {
@@ -239,20 +238,29 @@ class gltfContainerEx {
         this._gltf.buffers[0] = {};
         this._gltf.buffers[0].byteLength = source.byteLength;
         this._gltf.buffers[0].uri = 'data:application/octet-stream;base64,' + source.toString('base64');
-        //添加一个可能的坐标变换矩阵，
-        //this._gltf.
-        //将images嵌入在uri中
-        if (options.embedImage) {
-            this._gltf.images.forEach(img => { this.embedImage(img, filePath); });
+        //根据扩展名判断需要保存的路径
+        let ext = path.extname(filePath);
+        if (ext == ".gltf") {
+            if (options.embedImage) {
+                this._gltf.images.forEach(img => { this.embedImage(img, filePath); });
+            }
+            fs.writeJsonSync(filePath, this._gltf);
         }
-        if (options.exportglb) {
-            //let result= gltf2glb(this._gltf,null);
-            //fs.outputFileSync(filePath,result);
+        else if (ext == ".glb") {
+            //获取 
             let bufferGlb = gltfExporter_1.ConvertToGLB(this.Gltf, filePath);
-            //glb再转换成b3dm
+            fs.outputFileSync(filePath, bufferGlb, 'binary');
+        }
+        else if (ext == ".b3dm") {
+            let dir = path.resolve(filePath, "..");
+            let bufferGlb = gltfExporter_1.ConvertToGLB(this.Gltf, filePath);
+            var featureTableJson = {
+                BATCH_LENGTH: 0
+            };
+            fs.outputFile(filePath, glb2b3dm(bufferGlb, featureTableJson));
         }
         else {
-            fs.writeJsonSync(filePath, this._gltf);
+            console.log("err file extension,cant saveAs!");
         }
     }
     embedImage(image, filePath) {
@@ -433,7 +441,8 @@ class gltfContainerEx {
             //由于不同的texture也可能共用一个Image,因此需要查找图片uri是否相同，相同便不必添加直接返回imgId
             let imgIndex = this._gltf.images.findIndex(ele => { return ele.uri === image.uri; });
             if (imgIndex == -1) {
-                this._gltf.images.push(image);
+                let img = _.cloneDeep(image);
+                this._gltf.images.push(img);
                 newTexture.source = this._gltf.images.length - 1;
             }
             else {
@@ -480,7 +489,7 @@ class gltfContainerExTest {
         container ? newContainer.AddNode(container.Gltf.nodes[2], container) : null;
         container ? newContainer.AddNode(container.Gltf.nodes[3], container) : null;
         container ? newContainer.AddNode(container.Gltf.nodes[4], container) : null;
-        newContainer.SaveAsGLTF(outputPath);
+        newContainer.SaveAs(outputPath);
     }
 }
 exports.gltfContainerExTest = gltfContainerExTest;

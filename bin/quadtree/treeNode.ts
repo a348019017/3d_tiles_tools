@@ -118,8 +118,11 @@ export class TreeNode<T>
          return this._nodes;
      }
 
+     //四叉树是二维分割，因此在处理三维的情况时需要把可能的高度也返回出来
      get Bounds():Envelope3D
      {
+         //
+         this._bounds.ExpandToInclude(this.ContentEnvelope);
          return this._bounds;
      }
      
