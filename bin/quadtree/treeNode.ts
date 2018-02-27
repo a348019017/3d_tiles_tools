@@ -121,8 +121,13 @@ export class TreeNode<T>
      //四叉树是二维分割，因此在处理三维的情况时需要把可能的高度也返回出来
      get Bounds():Envelope3D
      {
-         //
-         this._bounds.ExpandToInclude(this.ContentEnvelope);
+         //如果当前不存在Conent也即当前节点为空时，为了确定高度，查询其子节点的bounds一般子节点是不为空的。
+         if(this._contentEnvelope){
+            this._bounds.ExpandToInclude(this.ContentEnvelope);
+         }else
+         {
+             this.SubNodes.forEach(subNode=>{subNode?this._bounds.ExpandToInclude(subNode.Bounds):null;});
+         }
          return this._bounds;
      }
      

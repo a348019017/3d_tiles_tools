@@ -56,24 +56,35 @@ function getComponentSize(type) {
     }
     return componentSize;
 }
+const _defaultMaterial = {
+    "pbrMetallicRoughness": {
+        "baseColorFactor": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+        ],
+        "metallicFactor": 0.0
+    },
+    "emissiveFactor": [
+        0.0,
+        0.0,
+        0.0
+    ],
+    "name": "_1_-_Default"
+};
 class gltfContainerEx {
     //如果没有便初始化一个新的——gltf
-    constructor(gltf) {
+    constructor(gltf, filename) {
         this._gltf = {};
         //当前容器中记录顶点，位置，法线和贴图的四个Arraybuffer（可变类型）
         this._buffer = {};
         //解析出对应于gltf中的buffer，可能多个,默认只有一个
         this._buffers = [];
+        filename ? this._fileName = filename : console.log("没有设置文件路径！");
         if (gltf) {
             this._gltf = gltf;
             this.initBuffer();
-            console.log("材质数量是否等于纹理数量:" + (this._gltf.materials.length === this._gltf.textures.length).toString());
-            console.log("图片数量是否等于纹理数量:" + (this._gltf.textures.length === this._gltf.images.length).toString());
-            //默认材质的数量和primitives数量是相等的
-            //primitive数量是否等于matearial数量
-            //let primsCount=0;
-            //this._gltf.meshes.forEach(ele=> {primsCount+=ele.primitives.length;} );
-            //console.log("primitive数量是否等于matearial数量"+primsCount===this._gltf.ma);
         }
         else {
             //初始化一个新的gltf
@@ -142,6 +153,9 @@ class gltfContainerEx {
             this._gltf = newgltf;
         }
     }
+    get FileName() {
+        return this._fileName;
+    }
     //返回当前容器中的gltf文件
     get Gltf() {
         return this._gltf;
@@ -208,7 +222,7 @@ class gltfContainerEx {
     }
     //保存为gltf文件
     SaveAs(filePath, options = {
-            embedImage: false,
+            embedImage: false, defaultMaterial: false
         }) {
         //默认在有images的情况下添加一个sampler
         if (this._gltf.images.length > 0) {
@@ -238,22 +252,34 @@ class gltfContainerEx {
         this._gltf.buffers[0] = {};
         this._gltf.buffers[0].byteLength = source.byteLength;
         this._gltf.buffers[0].uri = 'data:application/octet-stream;base64,' + source.toString('base64');
+        //当设置为默认材质时，修改所有的材质系统为默认材质，为了保证不影响到原始的gltf这里需要copy一个gltf进行操作
+        let newgltf = _.cloneDeep(this._gltf);
+        if (options.defaultMaterial) {
+            newgltf.materials = [_defaultMaterial];
+            newgltf.textures = [];
+            newgltf.images = [];
+            newgltf.meshes.forEach(mesh => {
+                mesh.primitives.forEach(pri => {
+                    pri.material = 0;
+                });
+            });
+        }
         //根据扩展名判断需要保存的路径
         let ext = path.extname(filePath);
         if (ext == ".gltf") {
             if (options.embedImage) {
-                this._gltf.images.forEach(img => { this.embedImage(img, filePath); });
+                newgltf.images.forEach(img => { this.embedImage(img, filePath); });
             }
-            fs.writeJsonSync(filePath, this._gltf);
+            fs.writeJsonSync(filePath, newgltf);
         }
         else if (ext == ".glb") {
             //获取 
-            let bufferGlb = gltfExporter_1.ConvertToGLB(this.Gltf, filePath);
+            let bufferGlb = gltfExporter_1.ConvertToGLB(newgltf, filePath);
             fs.outputFileSync(filePath, bufferGlb, 'binary');
         }
         else if (ext == ".b3dm") {
             let dir = path.resolve(filePath, "..");
-            let bufferGlb = gltfExporter_1.ConvertToGLB(this.Gltf, filePath);
+            let bufferGlb = gltfExporter_1.ConvertToGLB(newgltf, filePath);
             var featureTableJson = {
                 BATCH_LENGTH: 0
             };
@@ -282,9 +308,14 @@ class gltfContainerEx {
     }
     initBuffer() {
         this._buffers = this._gltf.buffers.map(buf => {
-            if (this.isDataUrl(buf.uri))
+            if (this.isDataUrl(buf.uri)) {
                 console.log("a buffer is  datauri!so read it!");
-            return dataUriToBuffer(buf.uri);
+                return dataUriToBuffer(buf.uri);
+            }
+            else {
+                let bufferPath = path.resolve(this._fileName, "../" + buf.uri);
+                return fs.readFileSync(bufferPath);
+            }
         });
     }
     //判断uri是否是datauri
@@ -300,7 +331,7 @@ class gltfContainerEx {
         let exit = fs.pathExistsSync(filePath);
         if (exit) {
             let gltf = fs.readJsonSync(filePath);
-            let newContainer = new gltfContainerEx(gltf);
+            let newContainer = new gltfContainerEx(gltf, filePath);
             return newContainer;
         }
         return null;
@@ -405,14 +436,12 @@ class gltfContainerEx {
             let materialsId = pri.material;
             let material = gltf.Gltf.materials[materialsId];
             //
-            //获取其中引用的纹理Id
+            //获取其中引用的纹理Id,三种纹理的
             let textureId1 = material.pbrMetallicRoughness && material.pbrMetallicRoughness.baseColorTexture ? material.pbrMetallicRoughness.baseColorTexture.index : -1;
             let textureId2 = material.emissiveTexture ? material.emissiveTexture.index : -1;
             let textureId3 = material.occlusionTexture ? material.occlusionTexture.index : -1;
-            if ((textureId1 != textureId2 || textureId2 != textureId3) && textureId1 == -1) {
-                console.log("三个纹理地址不一致或者没有纹理，暂不支持");
-            }
-            else {
+            let newmaterial = _.cloneDeep(material);
+            if (textureId1 != -1) {
                 //获取此纹理
                 let texture = gltf.Gltf.textures[textureId1];
                 //如果源纹理没有名称，给予源纹理一个名称,均是通过此
@@ -420,15 +449,30 @@ class gltfContainerEx {
                 //查找此纹理是否已经保存，如果是便使用保存的纹理，否便创建新的纹理，使用纹理名称作为标识。（无名称使用Id号）
                 let newTextureId = this.AddOrGetTextureId(texture, gltf);
                 //材质中的三种坐标均相同，暂不详究
-                let newmaterial = _.cloneDeep(material);
                 newmaterial.pbrMetallicRoughness.baseColorTexture.index = newTextureId;
-                newmaterial.emissiveTexture.index = newTextureId;
-                newmaterial.occlusionTexture.index = newTextureId;
-                //添加材质库,材质库数量和primitive相同，因此不需要判断重复性
-                this._gltf.materials.push(newmaterial);
-                //在prj中添加材质Id，否则不添加
-                newprj.material = this._gltf.materials.length - 1;
             }
+            if (textureId2 != -1) {
+                let texture = gltf.Gltf.textures[textureId1];
+                //如果源纹理没有名称，给予源纹理一个名称,均是通过此
+                texture.name = texture.name ? texture.name : meshName + "_" + textureId1.toString();
+                //查找此纹理是否已经保存，如果是便使用保存的纹理，否便创建新的纹理，使用纹理名称作为标识。（无名称使用Id号）
+                let newTextureId = this.AddOrGetTextureId(texture, gltf);
+                //材质中的三种坐标均相同，暂不详究
+                newmaterial.emissiveTexture ? newmaterial.emissiveTexture.index = newTextureId : null;
+            }
+            if (textureId3 != -1) {
+                let texture = gltf.Gltf.textures[textureId1];
+                //如果源纹理没有名称，给予源纹理一个名称,均是通过此
+                texture.name = texture.name ? texture.name : meshName + "_" + textureId1.toString();
+                //查找此纹理是否已经保存，如果是便使用保存的纹理，否便创建新的纹理，使用纹理名称作为标识。（无名称使用Id号）
+                let newTextureId = this.AddOrGetTextureId(texture, gltf);
+                //材质中的三种坐标均相同，暂不详究
+                newmaterial.occlusionTexture ? newmaterial.occlusionTexture.index = newTextureId : null;
+            }
+            //添加材质库,材质库数量和primitive相同，因此不需要判断重复性
+            this._gltf.materials.push(newmaterial);
+            //在prj中添加材质Id，否则不添加
+            newprj.material = this._gltf.materials.length - 1;
         });
     }
     AddOrGetTextureId(originalTexture, gltf) {
